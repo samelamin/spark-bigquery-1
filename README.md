@@ -1,6 +1,8 @@
 spark-bigquery
 ===============
 
+[![Build Status](https://travis-ci.org/appsflyer-dev/spark-bigquery.png)](https://travis-ci.org/appsflyer-dev/spark-bigquery)
+
 This Spark module allows saving DataFrame as BigQuery table.
 
 The project was inspired by [spotify/spark-bigquery](https://github.com/spotify/spark-bigquery), but there are several differences:
