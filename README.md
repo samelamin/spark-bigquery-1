@@ -19,21 +19,21 @@ The project was inspired by [spotify/spark-bigquery](https://github.com/spotify/
 * DataFrame's schema is automatically adapted to a legal one:
 
   1. Illegal characters are replaced with `_`
-  2. Field names are converted to lower case to avoid ambiguity.
+  2. Field names are converted to lower case to avoid ambiguity
   3. Duplicate field names are given a numeric suffix (`_1`, `_2`, etc.)
 
 ## Usage
 
+### Saving DataFrame as BigQuery table
+
 ```scala
 import com.appsflyer.spark.bigquery.BigQuerySpark._
-
-val sqlContext = ...
-sqlContext.setBigQueryGcsBucket("temp-bucket")
-sqlContext.setBigQueryProjectId("project-id")
 
 val df = ...
 df.saveAsBigQueryTable("project-id:dataset-id.table-name")
 ```
+
+Please note that data set must already exist.
 
 # License
 
