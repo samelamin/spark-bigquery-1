@@ -31,20 +31,20 @@ object BigQuerySchema {
 
   private def getMode(field: StructField) = {
     field.dataType match {
-      case ArrayType(_, _) => "repeated"
-      case _ => if (field.nullable) "nullable" else "required"
+      case ArrayType(_, _) => "REPEATED"
+      case _ => if (field.nullable) "NULLABLE" else "REQUIRED"
     }
   }
 
   private def getTypeName(dataType: DataType) = {
     dataType match {
-      case ByteType | ShortType | IntegerType | LongType => "integer"
-      case FloatType | DoubleType => "float"
-      case _: DecimalType | StringType => "string"
-      case BinaryType => "bytes"
-      case BooleanType => "boolean"
-      case TimestampType => "timestamp"
-      case ArrayType(_, _) | MapType(_, _, _) | _: StructType => "record"
+      case ByteType | ShortType | IntegerType | LongType => "INTEGER"
+      case FloatType | DoubleType => "FLOAT"
+      case _: DecimalType | StringType => "STRING"
+      case BinaryType => "BYTES"
+      case BooleanType => "BOOLEAN"
+      case TimestampType => "TIMESTAMP"
+      case ArrayType(_, _) | MapType(_, _, _) | _: StructType => "RECORD"
     }
   }
 
@@ -58,7 +58,7 @@ object BigQuerySchema {
           case _: ArrayType =>
             throw new IllegalArgumentException(s"Multidimensional arrays are not supported: ${field.name}")
           case other =>
-            ("type" -> typeToJson(field, other))
+            typeToJson(field, other)
         }
       case mapType: MapType =>
         throw new IllegalArgumentException(s"Unsupported type: ${dataType}")

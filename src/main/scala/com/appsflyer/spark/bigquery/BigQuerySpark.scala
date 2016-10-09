@@ -29,7 +29,7 @@ object BigQuerySpark {
   implicit class BigQuerySQLContext(sqlContext: SQLContext) extends Serializable {
 
     @transient
-    val hadoopConf = sqlContext.sparkContext.hadoopConfiguration
+    lazy val hadoopConf = sqlContext.sparkContext.hadoopConfiguration
 
     /**
       * Set GCP project ID for BigQuery.
@@ -52,10 +52,10 @@ object BigQuerySpark {
   implicit class BigQueryDataFrame(df: DataFrame) extends Serializable {
 
     @transient
-    val hadoopConf = df.sqlContext.sparkContext.hadoopConfiguration
+    lazy val hadoopConf = df.sqlContext.sparkContext.hadoopConfiguration
 
     @transient
-    val jsonParser = new JsonParser()
+    lazy val jsonParser = new JsonParser()
 
     /**
       * @param fullyQualifiedOutputTableId output-table id of the form

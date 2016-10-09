@@ -8,6 +8,11 @@ This Spark module allows saving DataFrame as BigQuery table.
 ```scala
 import com.appsflyer.spark.bigquery.BigQuerySpark._
 
+val sqlContext = ...
+sqlContext.setBigQueryGcsBucket("temp-bucket")
+sqlContext.setBigQueryProjectId("project-id")
+
+val df = ...
 df.saveAsBigQueryTable("project-id:dataset-id.table-name")
 ```
 
