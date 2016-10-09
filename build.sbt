@@ -1,0 +1,53 @@
+/*
+ * Copyright 2016 Appsflyer.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+name := "spark-bigquery"
+organization := "com.appsflyer"
+scalaVersion := "2.11.8"
+crossScalaVersions := Seq("2.10.6", "2.11.8")
+
+spName := "appsflyer/spark-bigquery"
+sparkVersion := "2.0.0"
+sparkComponents := Seq("core", "sql")
+spAppendScalaVersion := true
+spIncludeMaven := true
+
+libraryDependencies ++= Seq(
+  "com.databricks" %% "spark-avro" % "3.0.0",
+  "com.google.cloud.bigdataoss" % "bigquery-connector" % "0.8.0-hadoop2"
+    exclude ("com.google.guava", "guava-jdk5"),
+  "org.scalatest" %% "scalatest" % "2.2.1" % "test"
+)
+
+// Release settings
+licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0")
+releaseCrossBuild             := true
+releasePublishArtifactsAction := PgpKeys.publishSigned.value
+pomExtra                      := {
+  <url>https://github.com/appsflyerdev/spark-bigquery</url>
+  <scm>
+    <url>git@github.com/appsflyerdev/spark-bigquery.git</url>
+    <connection>scm:git:git@github.com:appsflyerdev/spark-bigquery.git</connection>
+  </scm>
+  <developers>
+    <developer>
+      <id>spektom</id>
+      <name>Michael Spector</name>
+      <url>https://github.com/spektom</url>
+    </developer>
+  </developers>
+}
