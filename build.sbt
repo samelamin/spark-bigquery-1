@@ -20,11 +20,12 @@ organization := "com.appsflyer"
 scalaVersion := "2.11.8"
 crossScalaVersions := Seq("2.10.6", "2.11.8")
 
-spName := "appsflyer/spark-bigquery"
+spName := "appsflyer-dev/spark-bigquery"
 sparkVersion := "2.0.0"
 sparkComponents := Seq("core", "sql")
 spAppendScalaVersion := true
 spIncludeMaven := true
+credentials += Credentials(Path.userHome / ".ivy2" / ".sbtcredentials")
 
 libraryDependencies ++= Seq(
   "com.databricks" %% "spark-avro" % "3.0.0",
@@ -38,15 +39,16 @@ licenses += "Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0")
 releaseCrossBuild             := true
 releasePublishArtifactsAction := PgpKeys.publishSigned.value
 pomExtra                      := {
-  <url>https://github.com/appsflyerdev/spark-bigquery</url>
+  <url>https://github.com/appsflyer-dev/spark-bigquery</url>
   <scm>
-    <url>git@github.com/appsflyerdev/spark-bigquery.git</url>
-    <connection>scm:git:git@github.com:appsflyerdev/spark-bigquery.git</connection>
+    <url>git@github.com/appsflyer-dev/spark-bigquery.git</url>
+    <connection>scm:git:git@github.com:appsflyer-dev/spark-bigquery.git</connection>
   </scm>
   <developers>
     <developer>
       <id>spektom</id>
       <name>Michael Spector</name>
+      <email>michael@appsflyer.com</email>
       <url>https://github.com/spektom</url>
     </developer>
   </developers>
