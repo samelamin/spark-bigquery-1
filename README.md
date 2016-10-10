@@ -26,6 +26,39 @@ The project was inspired by [spotify/spark-bigquery](https://github.com/spotify/
 
 ## Usage
 
+### Including spark-bigquery into your project
+
+#### Maven
+
+```xml
+<repositories>
+  <repository>
+    <id>oss-sonatype</id>
+    <name>oss-sonatype</name>
+    <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+    <snapshots>
+      <enabled>true</enabled>
+    </snapshots>
+  </repository>
+</repositories>
+
+<dependencies>
+  <dependency>
+    <groupId>com.appsflyer</groupId>
+    <artifactId>spark-bigquery_${scala.binary.version}</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </dependency>
+</dependencies>
+```
+
+#### SBT
+
+```sbt
+resolvers += Opts.resolver.sonatypeSnapshots
+
+libraryDependencies += "com.appsflyer" %% "spark-bigquery" % "0.1.0-SNAPSHOT"
+```
+
 ### Saving DataFrame as BigQuery table
 
 ```scala
