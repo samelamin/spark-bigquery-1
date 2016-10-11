@@ -12,7 +12,7 @@ package object streaming {
     *
     * Sample usage:
     *
-    * <code>df.writeStream.bigQuery("project-id:dataset-id.table-id")</code>
+    * <code>df.writeStream.bigQueryTable("project-id:dataset-id.table-id")</code>
     */
   implicit class BigQueryDataFrameWriter(writer: DataStreamWriter[String]) extends Serializable {
 
