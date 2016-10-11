@@ -1,27 +1,11 @@
-/*
- * Copyright 2016 Appsflyer.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
+package com.appsflyer.spark
 
-package com.appsflyer.spark.bigquery
+import com.appsflyer.spark.bigquery.streaming._
+import com.google.cloud.hadoop.io.bigquery.{BigQueryOutputFormat, BigQueryConfiguration}
+import com.google.gson.JsonParser
+import org.apache.spark.sql._
 
-import com.google.cloud.hadoop.io.bigquery.{BigQueryConfiguration, BigQueryOutputFormat}
-import com.google.gson.{JsonParser, JsonParseException}
-import org.apache.spark.sql.{DataFrame, SQLContext}
-
-object BigQuerySpark {
+package object bigquery {
 
   /**
     * Enhanced version of SQLContext with BigQuery support.
@@ -51,6 +35,8 @@ object BigQuerySpark {
     */
   implicit class BigQueryDataFrame(df: DataFrame) extends Serializable {
 
+    val adaptedDf = BigQueryAdapter(df)
+
     @transient
     lazy val hadoopConf = df.sqlContext.sparkContext.hadoopConfiguration
 
@@ -58,20 +44,37 @@ object BigQuerySpark {
     lazy val jsonParser = new JsonParser()
 
     /**
+      * Save DataFrame data into BigQuery table using Hadoop writer API
+      *
       * @param fullyQualifiedOutputTableId output-table id of the form
       *                                    [optional projectId]:[datasetId].[tableId]
       */
     def saveAsBigQueryTable(fullyQualifiedOutputTableId: String): Unit = {
-      val adaptedDf = BigQueryAdapter(df)
       val tableSchema = BigQuerySchema(adaptedDf)
 
       BigQueryConfiguration.configureBigQueryOutput(hadoopConf, fullyQualifiedOutputTableId, tableSchema)
       hadoopConf.set("mapreduce.job.outputformat.class", classOf[BigQueryOutputFormat[_, _]].getName)
 
-      adaptedDf.toJSON
+      adaptedDf
+        .toJSON
         .rdd
         .map(json => (null, jsonParser.parse(json)))
         .saveAsNewAPIHadoopDataset(hadoopConf)
+    }
+
+    /**
+      * Save DataFrame data into BigQuery table using streaming API
+      *
+      * @param fullyQualifiedOutputTableId output-table id of the form
+      *                                    [optional projectId]:[datasetId].[tableId]
+      * @param batchSize                   number of rows to write to BigQuery at once
+      *                                    (default: 500)
+      */
+    def streamToBigQueryTable(fullyQualifiedOutputTableId: String, batchSize: Int = 500): Unit = {
+      adaptedDf
+        .toJSON
+        .writeStream
+        .bigQueryTable(fullyQualifiedOutputTableId)
     }
   }
 }
