@@ -59,16 +59,27 @@ resolvers += Opts.resolver.sonatypeSnapshots
 libraryDependencies += "com.appsflyer" %% "spark-bigquery" % "0.1.0-SNAPSHOT"
 ```
 
-### Saving DataFrame as BigQuery table
+### Saving DataFrame using BigQuery Hadoop writer API
 
 ```scala
-import com.appsflyer.spark.bigquery.BigQuerySpark._
+import com.appsflyer.spark.bigquery._
 
 val df = ...
 df.saveAsBigQueryTable("project-id:dataset-id.table-name")
 ```
 
-Please note that data set must already exist.
+### Saving DataFrame using BigQuery streaming API
+
+```scala
+import com.appsflyer.spark.bigquery._
+
+val df = ...
+df.streamToBigQueryTable("project-id:dataset-id.table-name")
+```
+
+Notes on using this API:
+
+ * Target data set must already exist
 
 # License
 
