@@ -46,7 +46,7 @@ The project was inspired by [spotify/spark-bigquery](https://github.com/spotify/
   <dependency>
     <groupId>com.appsflyer</groupId>
     <artifactId>spark-bigquery_${scala.binary.version}</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
   </dependency>
 </dependencies>
 ```
@@ -56,7 +56,7 @@ The project was inspired by [spotify/spark-bigquery](https://github.com/spotify/
 ```sbt
 resolvers += Opts.resolver.sonatypeSnapshots
 
-libraryDependencies += "com.appsflyer" %% "spark-bigquery" % "0.1.0-SNAPSHOT"
+libraryDependencies += "com.appsflyer" %% "spark-bigquery" % "0.1.0"
 ```
 
 ### Saving DataFrame using BigQuery Hadoop writer API
