@@ -23,7 +23,7 @@ crossScalaVersions := Seq("2.10.6", "2.11.8")
 spName := "appsflyer-dev/spark-bigquery"
 sparkVersion := "2.0.0"
 sparkComponents := Seq("core", "sql")
-spAppendScalaVersion := true
+spAppendScalaVersion := false
 spIncludeMaven := true
 credentials += Credentials(Path.userHome / ".ivy2" / ".sbtcredentials")
 
