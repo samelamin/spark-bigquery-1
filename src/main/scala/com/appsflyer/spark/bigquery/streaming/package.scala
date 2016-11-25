@@ -23,9 +23,11 @@ package object streaming {
       *                                    [optional projectId]:[datasetId].[tableId]
       * @param batchSize                   number of rows to write to BigQuery at once
       *                                    (default: 500)
+      * @param isPartitionedByDay          Partition table by day
+      *                                    (default: 500)
       */
-    def bigQueryTable(fullyQualifiedOutputTableId: String, batchSize: Int = 500): Unit = {
-      val bigQueryWriter = new BigQueryStreamWriter(fullyQualifiedOutputTableId, batchSize)
+    def bigQueryTable(fullyQualifiedOutputTableId: String, batchSize: Int = 500, isPartitionedByDay: Boolean = false): Unit = {
+      val bigQueryWriter = new BigQueryStreamWriter(fullyQualifiedOutputTableId, batchSize, isPartitionedByDay)
       writer.foreach(bigQueryWriter)
         .start
     }

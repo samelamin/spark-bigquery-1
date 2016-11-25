@@ -1,13 +1,16 @@
 package com.appsflyer.spark.bigquery.streaming
 
 import com.appsflyer.spark.bigquery.BigQueryServiceFactory
+import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.services.bigquery.Bigquery
-import com.google.api.services.bigquery.model.{TableDataInsertAllRequest, TableReference}
+import com.google.api.services.bigquery.model.{Table, TableDataInsertAllRequest, TableReference, TimePartitioning}
 import com.google.cloud.hadoop.io.bigquery.BigQueryStrings
 import com.google.gson.Gson
 import org.apache.spark.sql.ForeachWriter
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.JavaConversions._
+import scala.util.control.NonFatal
 
 
 /**
@@ -17,13 +20,16 @@ import scala.collection.JavaConversions._
   *                                    [optional projectId]:[datasetId].[tableId]
   * @param batchSize                   number of rows to write to BigQuery at once
   */
-class BigQueryStreamWriter(fullyQualifiedOutputTableId: String, batchSize: Int) extends ForeachWriter[String] {
+class BigQueryStreamWriter(fullyQualifiedOutputTableId: String, batchSize: Int,
+                           isPartitionedByDay: Boolean = false) extends ForeachWriter[String] {
 
   @transient
   lazy val targetTable: TableReference = BigQueryStrings.parseTableReference(fullyQualifiedOutputTableId)
+  private val logger: Logger = LoggerFactory.getLogger(classOf[BigQueryStreamWriter])
 
   @transient
   var batchId: Long = 0
+  val DEFAULT_TABLE_EXPIRATION_MS = 259200000L
 
   @transient
   var bqService: Bigquery = null
@@ -48,6 +54,27 @@ class BigQueryStreamWriter(fullyQualifiedOutputTableId: String, batchSize: Int) 
   }
 
   override def process(value: String): Unit = {
+
+    if(isPartitionedByDay) {
+      val datasetId = targetTable.getDatasetId
+      val projectId: String = targetTable.getProjectId
+      val tableName = targetTable.getTableId
+      try {
+        logger.info("Creating Time Partitioned Table")
+        val table = new Table();
+        table.setTableReference(targetTable)
+        val timePartitioning = new TimePartitioning();
+        timePartitioning.setType("DAY");
+        timePartitioning.setExpirationMs(DEFAULT_TABLE_EXPIRATION_MS);
+        table.setTimePartitioning(timePartitioning);
+        val request = bqService.tables().insert(projectId, datasetId, table);
+        val response = request.execute();
+      } catch {
+        case e: GoogleJsonResponseException if e.getStatusCode == 409 =>
+          logger.info(s"$projectId:$datasetId.$tableName already exists")
+        case NonFatal(e) => throw e
+      }
+    }
     if (rowIndex < batchSize) {
       rows(rowIndex).setJson(gson.fromJson(value, targetClass)).setInsertId(s"${batchId}_${rowIndex}")
       rowIndex = rowIndex + 1
