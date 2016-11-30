@@ -22,11 +22,11 @@ package object bigquery {
       */
     def setBigQueryProjectId(projectId: String): Unit = {
       hadoopConf.set(BigQueryConfiguration.PROJECT_ID_KEY, projectId)
+    }
 
+    def setGSProjectId(projectId: String): Unit = {
       // Also set project ID for GCS connector
-      if (hadoopConf.get("fs.gs.project.id") == null) {
-        hadoopConf.set("fs.gs.project.id", projectId)
-      }
+      hadoopConf.set("fs.gs.project.id", projectId)
     }
 
     /**
