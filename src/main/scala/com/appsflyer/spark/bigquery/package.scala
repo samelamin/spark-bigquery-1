@@ -64,8 +64,7 @@ package object bigquery {
     * Enhanced version of DataFrame with BigQuery support.
     */
   implicit class BigQueryDataFrame(df: DataFrame) extends Serializable {
-
-    val adaptedDf = BigQueryAdapter(df)
+    val adaptedDf: DataFrame = BigQueryAdapter(df)
 
     @transient
     lazy val hadoopConf = df.sqlContext.sparkContext.hadoopConfiguration
