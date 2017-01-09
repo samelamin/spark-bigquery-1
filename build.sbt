@@ -30,7 +30,7 @@ credentials += Credentials(Path.userHome / ".ivy2" / ".sbtcredentials")
 
 libraryDependencies ++= Seq(
   "com.databricks" %% "spark-avro" % "3.0.0",
-  "com.holdenkarau" % "spark-testing-base_2.11" % "2.0.0_0.4.7" % "test",
+  "com.holdenkarau" %% "spark-testing-base" % "2.0.0_0.4.7" % "test",
   "org.apache.spark" %% "spark-hive" % "2.0.0" % "test",
   "com.google.cloud.bigdataoss" % "bigquery-connector" % "0.8.0-hadoop2"
     exclude ("com.google.guava", "guava-jdk5"),
