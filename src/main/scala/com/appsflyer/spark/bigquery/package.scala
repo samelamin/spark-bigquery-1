@@ -58,7 +58,6 @@ package object bigquery {
       hadoopConf.set("mapred.bq.auth.service.account.keyfile", pk12KeyFile)
       hadoopConf.set("fs.gs.auth.service.account.keyfile", pk12KeyFile)
     }
-
   }
 
   /**
