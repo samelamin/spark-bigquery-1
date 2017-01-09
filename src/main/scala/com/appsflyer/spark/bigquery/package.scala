@@ -1,6 +1,7 @@
 package com.appsflyer.spark
 
 import com.appsflyer.spark.bigquery.streaming._
+import com.appsflyer.spark.utils.BigQueryPartitionUtils
 import com.google.cloud.hadoop.io.bigquery.{BigQueryConfiguration, BigQueryOutputFormat}
 import com.google.gson.JsonParser
 import org.apache.spark.sql._
@@ -64,8 +65,7 @@ package object bigquery {
     * Enhanced version of DataFrame with BigQuery support.
     */
   implicit class BigQueryDataFrame(df: DataFrame) extends Serializable {
-
-    val adaptedDf = BigQueryAdapter(df)
+    val adaptedDf: DataFrame = BigQueryAdapter(df)
 
     @transient
     lazy val hadoopConf = df.sqlContext.sparkContext.hadoopConfiguration
@@ -79,12 +79,17 @@ package object bigquery {
       * @param fullyQualifiedOutputTableId output-table id of the form
       *                                    [optional projectId]:[datasetId].[tableId]
       */
-    def saveAsBigQueryTable(fullyQualifiedOutputTableId: String): Unit = {
+    def saveAsBigQueryTable(fullyQualifiedOutputTableId: String, isPartitionedByDay: Boolean = false): Unit = {
       val tableSchema = BigQuerySchema(adaptedDf)
 
       BigQueryConfiguration.configureBigQueryOutput(hadoopConf, fullyQualifiedOutputTableId, tableSchema)
       hadoopConf.set("mapreduce.job.outputformat.class", classOf[BigQueryOutputFormat[_, _]].getName)
+      val bqService = BigQueryServiceFactory.getService
+      val targetTable = BigQueryStrings.parseTableReference(fullyQualifiedOutputTableId)
 
+      if(isPartitionedByDay) {
+        BigQueryPartitionUtils.createBigQueryPartitionedTable(targetTable,bqService)
+      }
       adaptedDf
         .toJSON
         .rdd
