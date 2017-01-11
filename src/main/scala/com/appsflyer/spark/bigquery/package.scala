@@ -11,12 +11,6 @@ import org.apache.hadoop.io.LongWritable
 import com.google.gson.JsonObject
 
 package object bigquery {
-  object CreateDisposition extends Enumeration {
-    val CREATE_IF_NEEDED, CREATE_NEVER = Value
-  }
-  object WriteDisposition extends Enumeration {
-    val WRITE_TRUNCATE, WRITE_APPEND, WRITE_EMPTY = Value
-  }
   /**
     * Enhanced version of SQLContext with BigQuery support.
     */
@@ -26,7 +20,6 @@ package object bigquery {
     lazy val hadoopConf = sqlContext.sparkContext.hadoopConfiguration
     val bq = BigQueryClient.getInstance(hadoopConf)
     val sc = sqlContext.sparkContext
-
     val STAGING_DATASET_LOCATION = "bq.staging_dataset.location"
 
     /**
@@ -83,8 +76,6 @@ package object bigquery {
       val df = sqlContext.read.json(tableData)
       df
     }
-
-
   }
 
   /**
