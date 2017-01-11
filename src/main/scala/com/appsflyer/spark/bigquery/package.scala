@@ -2,13 +2,21 @@ package com.appsflyer.spark
 
 import com.appsflyer.spark.bigquery.streaming._
 import com.appsflyer.spark.utils.BigQueryPartitionUtils
+import com.google.api.services.bigquery.model.TableReference
 import com.google.cloud.hadoop.io.bigquery.{BigQueryConfiguration, BigQueryOutputFormat}
 import com.google.gson.JsonParser
 import org.apache.spark.sql._
 import com.google.cloud.hadoop.io.bigquery._
+import org.apache.hadoop.io.LongWritable
+import com.google.gson.JsonObject
 
 package object bigquery {
-
+  object CreateDisposition extends Enumeration {
+    val CREATE_IF_NEEDED, CREATE_NEVER = Value
+  }
+  object WriteDisposition extends Enumeration {
+    val WRITE_TRUNCATE, WRITE_APPEND, WRITE_EMPTY = Value
+  }
   /**
     * Enhanced version of SQLContext with BigQuery support.
     */
@@ -16,6 +24,9 @@ package object bigquery {
 
     @transient
     lazy val hadoopConf = sqlContext.sparkContext.hadoopConfiguration
+    val bq = BigQueryClient.getInstance(hadoopConf)
+    val sc = sqlContext.sparkContext
+
     val STAGING_DATASET_LOCATION = "bq.staging_dataset.location"
 
     /**
@@ -58,6 +69,22 @@ package object bigquery {
       hadoopConf.set("mapred.bq.auth.service.account.keyfile", pk12KeyFile)
       hadoopConf.set("fs.gs.auth.service.account.keyfile", pk12KeyFile)
     }
+    def bigQuerySelect(sqlQuery: String): DataFrame = bigQueryTable(bq.query(sqlQuery))
+    def bigQueryTable(tableReference: TableReference): DataFrame = {
+      val fullyQualifiedInputTableId = BigQueryStrings.toString(tableReference)
+      BigQueryConfiguration.configureBigQueryInput(hadoopConf, fullyQualifiedInputTableId)
+
+      val tableData = sc.newAPIHadoopRDD(
+        hadoopConf,
+        classOf[GsonBigQueryInputFormat],
+        classOf[LongWritable],
+        classOf[JsonObject]).map(_._2.toString)
+
+      val df = sqlContext.read.json(tableData)
+      df
+    }
+
+
   }
 
   /**

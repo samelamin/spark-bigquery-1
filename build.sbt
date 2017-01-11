@@ -34,6 +34,7 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-hive" % "2.0.0" % "test",
   "com.google.cloud.bigdataoss" % "bigquery-connector" % "0.8.0-hadoop2"
     exclude ("com.google.guava", "guava-jdk5"),
+  "joda-time" % "joda-time" % "2.9.3",
   "org.scalatest" %% "scalatest" % "2.2.1" % "test"
 )
 
