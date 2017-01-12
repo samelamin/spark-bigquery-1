@@ -1,5 +1,6 @@
 package com.appsflyer.spark
 
+import com.appsflyer.spark.bigquery.BigQueryClient
 import com.appsflyer.spark.bigquery.streaming._
 import com.appsflyer.spark.utils.BigQueryPartitionUtils
 import com.google.api.services.bigquery.model.TableReference
@@ -18,7 +19,7 @@ package object bigquery {
 
     @transient
     lazy val hadoopConf = sqlContext.sparkContext.hadoopConfiguration
-    val bq = BigQueryClient.getInstance(hadoopConf)
+    val bq = new BigQueryClient(sqlContext)
     val sc = sqlContext.sparkContext
     val STAGING_DATASET_LOCATION = "bq.staging_dataset.location"
 
@@ -62,7 +63,7 @@ package object bigquery {
       hadoopConf.set("mapred.bq.auth.service.account.keyfile", pk12KeyFile)
       hadoopConf.set("fs.gs.auth.service.account.keyfile", pk12KeyFile)
     }
-    def bigQuerySelect(sqlQuery: String): DataFrame = bigQueryTable(bq.query(sqlQuery))
+    def bigQuerySelect(sqlQuery: String): DataFrame = bq.query(sqlQuery)
     def bigQueryTable(tableReference: TableReference): DataFrame = {
       val fullyQualifiedInputTableId = BigQueryStrings.toString(tableReference)
       BigQueryConfiguration.configureBigQueryInput(hadoopConf, fullyQualifiedInputTableId)

@@ -35,7 +35,8 @@ libraryDependencies ++= Seq(
   "com.google.cloud.bigdataoss" % "bigquery-connector" % "0.8.0-hadoop2"
     exclude ("com.google.guava", "guava-jdk5"),
   "joda-time" % "joda-time" % "2.9.3",
-  "org.scalatest" %% "scalatest" % "2.2.1" % "test"
+  "org.mockito" % "mockito-core" % "1.8.5" % "test",
+  "org.scalatest" %% "scalatest" % "2.2.5" % "test"
 )
 
 // Release settings
