@@ -130,7 +130,8 @@ class BigQueryClient(sqlContext: SQLContext, bigquery: Bigquery = null ) {
 
   private def temporaryTable(location: String): TableReference = {
     val now = Instant.now().toString(TIME_FORMATTER)
-    val tableId = TABLE_ID_PREFIX + "_" + now + "_" + Random.nextInt(Int.MaxValue)
+//    val tableId = TABLE_ID_PREFIX + "_" + now + "_" + Random.nextInt(Int.MaxValue)
+    val tableId = "test_dataset"
     new TableReference()
       .setProjectId(projectId)
       .setDatasetId(stagingDataset(location).getDatasetId)

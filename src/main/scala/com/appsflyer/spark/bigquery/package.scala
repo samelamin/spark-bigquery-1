@@ -11,6 +11,7 @@ import com.google.cloud.hadoop.io.bigquery._
 import org.apache.hadoop.io.LongWritable
 import com.google.gson.JsonObject
 
+
 package object bigquery {
   /**
     * Enhanced version of SQLContext with BigQuery support.

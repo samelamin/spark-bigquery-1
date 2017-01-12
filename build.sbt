@@ -36,7 +36,6 @@ libraryDependencies ++= Seq(
     exclude ("com.google.guava", "guava-jdk5"),
   "joda-time" % "joda-time" % "2.9.3",
   "org.mockito" % "mockito-core" % "1.8.5" % "test",
-  "net.sourceforge.htmlcleaner" % "htmlcleaner" % "2.18",
   "org.scalatest" %% "scalatest" % "2.2.5" % "test"
 )
 
