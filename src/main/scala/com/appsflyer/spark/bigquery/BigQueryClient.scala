@@ -8,7 +8,7 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.services.bigquery.{Bigquery, BigqueryScopes}
-import com.google.api.services.bigquery.model._
+import com.google.api.services.bigquery.model.{Dataset, _}
 import com.google.cloud.hadoop.io.bigquery.{BigQueryConfiguration, BigQueryStrings, BigQueryUtils, GsonBigQueryInputFormat}
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.google.gson.JsonObject
@@ -108,6 +108,9 @@ class BigQueryClient(sqlContext: SQLContext, bigquery: Bigquery = null ) {
     val prefix = hadoopConf.get(STAGING_DATASET_PREFIX, STAGING_DATASET_PREFIX_DEFAULT)
     val datasetId = prefix + location.toLowerCase
     try {
+      Console.println(s"**** project id is $projectId")
+      Console.println(s"**** dataset id is $datasetId")
+      val test: Dataset = bigquery.datasets().get(projectId, datasetId).execute()
       bigquery.datasets().get(projectId, datasetId).execute()
       logger.info(s"Staging dataset $projectId:$datasetId already exists")
     } catch {

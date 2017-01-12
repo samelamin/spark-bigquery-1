@@ -1,33 +1,25 @@
 import com.appsflyer.spark.bigquery.BigQueryClient
 import com.google.api.services.bigquery.Bigquery
+import com.google.api.services.bigquery.model.Dataset
+import com.google.api.services.bigquery.model.DatasetList.Datasets
 import com.holdenkarau.spark.testing.DataFrameSuiteBase
-import org.scalatest.{FeatureSpec, GivenWhenThen}
+import org.scalatest.FeatureSpec
 import org.mockito.Mockito._
 import org.scalatest.Matchers._
-
+import org.scalatest.mock.MockitoSugar
+import org.mockito.Matchers.any
 /**
   * Created by root on 1/12/17.
   */
-class BigQueryClientSpecs extends FeatureSpec with GivenWhenThen with DataFrameSuiteBase {
-  val bigQueryMock =  mock(classOf[Bigquery])
+class BigQueryClientSpecs extends FeatureSpec with DataFrameSuiteBase with MockitoSugar  {
 
   scenario("When converting a simple dataframe") {
+    val bigQueryMock =  mock[Bigquery](RETURNS_DEEP_STUBS)
     val sqlCtx = sqlContext
-    Given("A sql query")
     val bigQueryClient =  new BigQueryClient(sqlCtx, bigQueryMock)
-    val sampleJson = """{
-                       |	"id": 1,
-                       |	"error": null
-                       |}""".stripMargin
-    val expectedDF = sqlCtx.read.json(sc.parallelize(List(sampleJson)))
+    when(bigQueryMock.datasets().get(any[String],any[String]).execute()).thenReturn(new Dataset)
     val sqlQuery = "SELECT * FROM test-table"
-
-    When("querying big query table")
     val actualDF = bigQueryClient.query(sqlQuery)
-
-    Then("We should receive a dataframe")
-    actualDF should not be null
-    actualDF should be (expectedDF)
 
   }
 }
