@@ -52,7 +52,6 @@ class BigQueryClient(sqlContext: SQLContext, bigquery: Bigquery = null ) {
   }
 
   private def projectId = hadoopConf.get(BigQueryConfiguration.PROJECT_ID_KEY)
-
   private val queryCache: LoadingCache[String, TableReference] =
     CacheBuilder.newBuilder()
       .expireAfterWrite(STAGING_DATASET_TABLE_EXPIRATION_MS, TimeUnit.MILLISECONDS)
@@ -108,9 +107,6 @@ class BigQueryClient(sqlContext: SQLContext, bigquery: Bigquery = null ) {
     val prefix = hadoopConf.get(STAGING_DATASET_PREFIX, STAGING_DATASET_PREFIX_DEFAULT)
     val datasetId = prefix + location.toLowerCase
     try {
-      Console.println(s"**** project id is $projectId")
-      Console.println(s"**** dataset id is $datasetId")
-      val test: Dataset = bigquery.datasets().get(projectId, datasetId).execute()
       bigquery.datasets().get(projectId, datasetId).execute()
       logger.info(s"Staging dataset $projectId:$datasetId already exists")
     } catch {
