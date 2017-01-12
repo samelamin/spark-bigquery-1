@@ -27,7 +27,7 @@ spAppendScalaVersion := false
 spIncludeMaven := true
 spIgnoreProvided := true
 credentials += Credentials(Path.userHome / ".ivy2" / ".sbtcredentials")
-
+parallelExecution in Test := false
 libraryDependencies ++= Seq(
   "com.databricks" %% "spark-avro" % "3.0.0",
   "com.holdenkarau" %% "spark-testing-base" % "2.0.0_0.4.7" % "test",
