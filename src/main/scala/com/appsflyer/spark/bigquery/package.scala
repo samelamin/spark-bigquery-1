@@ -20,7 +20,6 @@ package object bigquery {
     @transient
     lazy val hadoopConf = sqlContext.sparkContext.hadoopConfiguration
     val bq = new BigQueryClient(sqlContext)
-    val sc = sqlContext.sparkContext
     val STAGING_DATASET_LOCATION = "bq.staging_dataset.location"
 
     /**
