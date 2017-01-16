@@ -19,7 +19,7 @@ class BigQueryClientSpecs extends FeatureSpec with DataFrameSuiteBase with Mocki
   scenario("When reading from BQ") {
     val sqlCtx = sqlContext
     val hadoopConf = sqlCtx.sparkContext.hadoopConfiguration
-    val inputTmpDir = "/Users/sam.elamin/Spark/testfile2"
+    val inputTmpDir = "/Users/sam.elamin/IdeaProjects/testfile2"
 
     val sampleJson = """{
                        |	"id": 1,
@@ -74,8 +74,6 @@ class BigQueryClientSpecs extends FeatureSpec with DataFrameSuiteBase with Mocki
     //      classOf[LongWritable],
     //      classOf[JsonObject]).map(_._2.toString)
     val bigQueryMock =  mock[Bigquery](RETURNS_DEEP_STUBS)
-    val bigQueryUtilsMock =  mock[BigQueryUtils]
-
     val jobStatus = new com.google.api.services.bigquery.model.JobStatus
     jobStatus.setState("DONE")
     jobStatus.setErrorResult(null)
@@ -85,16 +83,16 @@ class BigQueryClientSpecs extends FeatureSpec with DataFrameSuiteBase with Mocki
 
     val jobReference = new JobReference()
     jobReference.setProjectId("testProjectID")
-
     val jobHandle = new Job()
     jobHandle.setJobReference(new JobReference)
     jobHandle.setStatus(jobStatus)
 
     val bigQueryClient =  new BigQueryClient(sqlCtx, bigQueryMock)
+
     when(bigQueryMock.datasets().get(any[String],any[String]).execute()).thenReturn(dataSet)
     when(bigQueryMock.jobs().insert(any[String],any[Job]).execute()).thenReturn(jobHandle)
+
     when(bigQueryMock.jobs().get(any[String],any[String]).execute()).thenReturn(jobHandle)
-    when(bigQueryMock.).thenReturn(jobHandle)
     val sqlQuery = "SELECT * FROM test-table"
     val actualDF = bigQueryClient.query(sqlQuery)
   }

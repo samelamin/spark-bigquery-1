@@ -65,19 +65,6 @@ package object bigquery {
       hadoopConf.set("fs.gs.auth.service.account.keyfile", pk12KeyFile)
     }
     def bigQuerySelect(sqlQuery: String): DataFrame = bq.query(sqlQuery)
-    def bigQueryTable(tableReference: TableReference): DataFrame = {
-      val fullyQualifiedInputTableId = BigQueryStrings.toString(tableReference)
-      BigQueryConfiguration.configureBigQueryInput(hadoopConf, fullyQualifiedInputTableId)
-
-      val tableData = sc.newAPIHadoopRDD(
-        hadoopConf,
-        classOf[GsonBigQueryInputFormat],
-        classOf[LongWritable],
-        classOf[JsonObject]).map(_._2.toString)
-
-      val df = sqlContext.read.json(tableData)
-      df
-    }
   }
 
   /**
