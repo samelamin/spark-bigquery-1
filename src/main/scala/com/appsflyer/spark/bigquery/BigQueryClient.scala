@@ -9,22 +9,28 @@ import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.services.bigquery.{Bigquery, BigqueryScopes}
 import com.google.api.services.bigquery.model._
-import com.google.cloud.hadoop.io.bigquery.{BigQueryConfiguration, BigQueryStrings, BigQueryUtils}
+import com.google.cloud.hadoop.io.bigquery.{BigQueryConfiguration, BigQueryStrings, BigQueryUtils, GsonBigQueryInputFormat}
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
+import com.google.gson.JsonObject
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.io.LongWritable
 import org.apache.hadoop.util.Progressable
-import scala.collection.JavaConverters._
+import org.apache.spark.sql._
+import org.apache.spark.sql.DataFrame
 
+import scala.collection.JavaConverters._
 import org.joda.time.Instant
 import org.joda.time.format.DateTimeFormat
-import org.slf4j.{LoggerFactory}
+import org.slf4j.LoggerFactory
+
 import scala.util.Random
 import scala.util.control.NonFatal
 
 /**
   * Created by sam elamin on 11/01/2017.
   */
-private[bigquery] object BigQueryClient {
+class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) {
+  val hadoopConf = sqlContext.sparkContext.hadoopConfiguration
   val STAGING_DATASET_PREFIX = "bq.staging_dataset.prefix"
   val STAGING_DATASET_PREFIX_DEFAULT = "spark_bigquery_staging_"
   val STAGING_DATASET_LOCATION = "bq.staging_dataset.location"
@@ -32,33 +38,20 @@ private[bigquery] object BigQueryClient {
   val STAGING_DATASET_TABLE_EXPIRATION_MS = 86400000L
   val STAGING_DATASET_DESCRIPTION = "Spark BigQuery staging dataset"
   val DEFAULT_TABLE_EXPIRATION_MS = 259200000L
-
-  private var instance: BigQueryClient = null
-
-  def getInstance(conf: Configuration): BigQueryClient = {
-    if (instance == null) {
-      instance = new BigQueryClient(conf)
-    }
-    instance
-  }
-}
-
-private[bigquery] class BigQueryClient(conf: Configuration) {
-
-  import BigQueryClient._
-
   private val logger = LoggerFactory.getLogger(classOf[BigQueryClient])
-
   private val SCOPES = List(BigqueryScopes.BIGQUERY).asJava
 
-  private val bigquery: Bigquery = {
-    val credential = GoogleCredential.getApplicationDefault.createScoped(SCOPES)
-    new Bigquery.Builder(new NetHttpTransport, new JacksonFactory, credential)
-      .setApplicationName("spark-bigquery")
-      .build()
+  if(bigquery == null) {
+    bigquery =
+    {
+      val credential = GoogleCredential.getApplicationDefault.createScoped(SCOPES)
+      new Bigquery.Builder(new NetHttpTransport, new JacksonFactory, credential)
+        .setApplicationName("spark-bigquery")
+        .build()
+    }
   }
 
-  private def projectId: String = conf.get(BigQueryConfiguration.PROJECT_ID_KEY)
+  private def projectId = hadoopConf.get(BigQueryConfiguration.PROJECT_ID_KEY)
 
   private val queryCache: LoadingCache[String, TableReference] =
     CacheBuilder.newBuilder()
@@ -68,7 +61,7 @@ private[bigquery] class BigQueryClient(conf: Configuration) {
         val sqlQuery = key
         logger.info(s"Executing query $sqlQuery")
 
-        val location = conf.get(STAGING_DATASET_LOCATION, STAGING_DATASET_LOCATION_DEFAULT)
+        val location = hadoopConf.get(STAGING_DATASET_LOCATION, STAGING_DATASET_LOCATION_DEFAULT)
         val destinationTable = temporaryTable(location)
         val tableName = BigQueryStrings.toString(destinationTable)
         logger.info(s"Destination table: $destinationTable")
@@ -89,7 +82,20 @@ private[bigquery] class BigQueryClient(conf: Configuration) {
   /**
     * Perform a BigQuery SELECT query and save results to a temporary table.
     */
-  def query(sqlQuery: String): TableReference = queryCache.get(sqlQuery)
+  def query(sqlQuery: String): DataFrame = {
+    val tableReference = queryCache.get(sqlQuery)
+    val fullyQualifiedInputTableId = BigQueryStrings.toString(tableReference)
+    BigQueryConfiguration.configureBigQueryInput(hadoopConf, fullyQualifiedInputTableId)
+
+    val tableData = sqlContext.sparkContext.newAPIHadoopRDD(
+      hadoopConf,
+      classOf[GsonBigQueryInputFormat],
+      classOf[LongWritable],
+      classOf[JsonObject]).map(_._2.toString)
+
+    val df = sqlContext.read.json(tableData)
+    df
+  }
 
   private def waitForJob(job: Job): Unit = {
     BigQueryUtils.waitForJobCompletion(bigquery, projectId, job.getJobReference, new Progressable {
@@ -99,7 +105,7 @@ private[bigquery] class BigQueryClient(conf: Configuration) {
 
   private def stagingDataset(location: String): DatasetReference = {
     // Create staging dataset if it does not already exist
-    val prefix = conf.get(STAGING_DATASET_PREFIX, STAGING_DATASET_PREFIX_DEFAULT)
+    val prefix = hadoopConf.get(STAGING_DATASET_PREFIX, STAGING_DATASET_PREFIX_DEFAULT)
     val datasetId = prefix + location.toLowerCase
     try {
       bigquery.datasets().get(projectId, datasetId).execute()
@@ -108,7 +114,7 @@ private[bigquery] class BigQueryClient(conf: Configuration) {
       case e: GoogleJsonResponseException if e.getStatusCode == 404 =>
         logger.info(s"Creating staging dataset $projectId:$datasetId")
         val dsRef = new DatasetReference().setProjectId(projectId).setDatasetId(datasetId)
-        val ds = new Dataset()
+        val ds = new  com.google.api.services.bigquery.model.Dataset()
           .setDatasetReference(dsRef)
           .setDefaultTableExpirationMs(STAGING_DATASET_TABLE_EXPIRATION_MS)
           .setDescription(STAGING_DATASET_DESCRIPTION)
