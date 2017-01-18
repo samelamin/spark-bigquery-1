@@ -10,7 +10,6 @@ class BigQuerySchemaSpecs extends FeatureSpec with GivenWhenThen with DataFrameS
   feature("Schema Converters. Dataframe To BQ Schema") {
     scenario("When converting a simple dataframe") {
       Given("A dataframe")
-      val sqlCtx = sqlContext
       val sampleJson = """{
                          |	"id": 1,
                          |	"error": null

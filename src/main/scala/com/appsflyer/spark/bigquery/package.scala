@@ -1,14 +1,17 @@
 package com.appsflyer.spark
 
+import com.appsflyer.spark.bigquery.BigQueryClient
 import com.appsflyer.spark.bigquery.streaming._
 import com.appsflyer.spark.utils.BigQueryPartitionUtils
+import com.google.api.services.bigquery.model.TableReference
 import com.google.cloud.hadoop.io.bigquery.{BigQueryConfiguration, BigQueryOutputFormat}
 import com.google.gson.JsonParser
 import org.apache.spark.sql._
 import com.google.cloud.hadoop.io.bigquery._
+import org.apache.hadoop.io.LongWritable
+import com.google.gson.JsonObject
 
 package object bigquery {
-
   /**
     * Enhanced version of SQLContext with BigQuery support.
     */
@@ -16,6 +19,7 @@ package object bigquery {
 
     @transient
     lazy val hadoopConf = sqlContext.sparkContext.hadoopConfiguration
+    val bq = new BigQueryClient(sqlContext)
     val STAGING_DATASET_LOCATION = "bq.staging_dataset.location"
 
     /**
@@ -58,6 +62,7 @@ package object bigquery {
       hadoopConf.set("mapred.bq.auth.service.account.keyfile", pk12KeyFile)
       hadoopConf.set("fs.gs.auth.service.account.keyfile", pk12KeyFile)
     }
+    def bigQuerySelect(sqlQuery: String): DataFrame = bq.query(sqlQuery)
   }
 
   /**
