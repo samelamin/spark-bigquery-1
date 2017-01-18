@@ -17,7 +17,7 @@ import org.apache.hadoop.io.LongWritable
 import org.apache.hadoop.util.Progressable
 import org.apache.spark.sql._
 import org.apache.spark.sql.DataFrame
-
+import com.google.api.services.bigquery.model.{Dataset => BQDataset}
 import scala.collection.JavaConverters._
 import org.joda.time.Instant
 import org.joda.time.format.DateTimeFormat
@@ -114,7 +114,7 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) {
       case e: GoogleJsonResponseException if e.getStatusCode == 404 =>
         logger.info(s"Creating staging dataset $projectId:$datasetId")
         val dsRef = new DatasetReference().setProjectId(projectId).setDatasetId(datasetId)
-        val ds = new  com.google.api.services.bigquery.model.Dataset()
+        val ds = new BQDataset()
           .setDatasetReference(dsRef)
           .setDefaultTableExpirationMs(STAGING_DATASET_TABLE_EXPIRATION_MS)
           .setDescription(STAGING_DATASET_DESCRIPTION)
