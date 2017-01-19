@@ -11,19 +11,25 @@ import com.google.cloud.hadoop.io.bigquery._
 import org.apache.hadoop.io.LongWritable
 import com.google.gson.JsonObject
 
-
 package object bigquery {
+
+  object CreateDisposition extends Enumeration {
+    val CREATE_IF_NEEDED, CREATE_NEVER = Value
+  }
+
+  object WriteDisposition extends Enumeration {
+    val WRITE_TRUNCATE, WRITE_APPEND, WRITE_EMPTY = Value
+  }
+
   /**
     * Enhanced version of SQLContext with BigQuery support.
     */
   implicit class BigQuerySQLContext(sqlContext: SQLContext) extends Serializable {
+    val bq = new BigQueryClient(sqlContext)
 
     @transient
     lazy val hadoopConf = sqlContext.sparkContext.hadoopConfiguration
-    val bq = new BigQueryClient(sqlContext)
-    val sc = sqlContext.sparkContext
-    val STAGING_DATASET_LOCATION = "bq.staging_dataset.location"
-
+    val STAGING_DATASET_LOCATION = bq.STAGING_DATASET_LOCATION
     /**
       * Set GCP project ID for BigQuery.
       */
@@ -40,13 +46,13 @@ package object bigquery {
       * Set GCS bucket for temporary BigQuery files.
       */
     def setBigQueryGcsBucket(gcsBucket: String): Unit =
-    hadoopConf.set(BigQueryConfiguration.GCS_BUCKET_KEY, gcsBucket)
+      hadoopConf.set(BigQueryConfiguration.GCS_BUCKET_KEY, gcsBucket)
 
     /**
       * Set BigQuery dataset location, e.g. US, EU.
       */
     def setBigQueryDatasetLocation(location: String): Unit =
-    hadoopConf.set(STAGING_DATASET_LOCATION, location)
+      hadoopConf.set(STAGING_DATASET_LOCATION, location)
 
     /**
       * Set GCP JSON key file.
@@ -72,6 +78,7 @@ package object bigquery {
     */
   implicit class BigQueryDataFrame(df: DataFrame) extends Serializable {
     val adaptedDf: DataFrame = BigQueryAdapter(df)
+    val bq = new BigQueryClient(df.sqlContext)
 
     @transient
     lazy val hadoopConf = df.sqlContext.sparkContext.hadoopConfiguration
@@ -79,23 +86,26 @@ package object bigquery {
     @transient
     lazy val jsonParser = new JsonParser()
 
+
     /**
       * Save DataFrame data into BigQuery table using Hadoop writer API
       *
       * @param fullyQualifiedOutputTableId output-table id of the form
       *                                    [optional projectId]:[datasetId].[tableId]
       */
-    def saveAsBigQueryTable(fullyQualifiedOutputTableId: String, isPartitionedByDay: Boolean = false): Unit = {
+    def saveAsBigQueryTable(fullyQualifiedOutputTableId: String,
+                            isPartitionedByDay: Boolean = false,
+                            writeDisposition: WriteDisposition.Value = null,
+                            createDisposition: CreateDisposition.Value = null): Unit = {
       val tableSchema = BigQuerySchema(adaptedDf)
-
       BigQueryConfiguration.configureBigQueryOutput(hadoopConf, fullyQualifiedOutputTableId, tableSchema)
       hadoopConf.set("mapreduce.job.outputformat.class", classOf[BigQueryOutputFormat[_, _]].getName)
-      val bqService = BigQueryServiceFactory.getService
+      val location = hadoopConf.get(bq.STAGING_DATASET_LOCATION)
       val targetTable = BigQueryStrings.parseTableReference(fullyQualifiedOutputTableId)
-
       if(isPartitionedByDay) {
-        BigQueryPartitionUtils.createBigQueryPartitionedTable(targetTable,bqService)
+        BigQueryPartitionUtils.createBigQueryPartitionedTable(targetTable)
       }
+
       adaptedDf
         .toJSON
         .rdd

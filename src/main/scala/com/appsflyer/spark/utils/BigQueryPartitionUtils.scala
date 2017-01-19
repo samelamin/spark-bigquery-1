@@ -1,5 +1,6 @@
 package com.appsflyer.spark.utils
 
+import com.appsflyer.spark.bigquery.BigQueryServiceFactory
 import com.appsflyer.spark.bigquery.streaming.BigQueryStreamWriter
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.services.bigquery.Bigquery
@@ -14,8 +15,9 @@ import scala.util.control.NonFatal
 object BigQueryPartitionUtils {
   private val logger: Logger = LoggerFactory.getLogger(classOf[BigQueryStreamWriter])
   val DEFAULT_TABLE_EXPIRATION_MS = 259200000L
+  val bqService = BigQueryServiceFactory.getService
 
-  def createBigQueryPartitionedTable(targetTable: TableReference, bqService: Bigquery): Any = {
+  def createBigQueryPartitionedTable(targetTable: TableReference): Any = {
     val datasetId = targetTable.getDatasetId
     val projectId: String = targetTable.getProjectId
     val tableName = targetTable.getTableId
