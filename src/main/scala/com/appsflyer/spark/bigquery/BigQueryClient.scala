@@ -53,7 +53,7 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
   if(bigquery == null) {
     bigquery =
       {
-        val credential = GoogleCredential.getApplicationDefault.createScoped(SCOPES)
+        val credential: GoogleCredential = GoogleCredential.getApplicationDefault.createScoped(SCOPES)
         new Bigquery.Builder(new NetHttpTransport, new JacksonFactory, credential)
           .setApplicationName("spark-bigquery")
           .build()
@@ -71,24 +71,28 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
   private val TIME_FORMATTER = DateTimeFormat.forPattern("yyyyMMddHHmmss")
 
 
-  def load(adaptedDf: DataFrame,fullyQualifiedOutputTableId: String, isPartitionedByDay: Boolean): Unit  = {
-    val tableSchema = BigQuerySchema(adaptedDf)
-    BigQueryConfiguration.configureBigQueryOutput(hadoopConf, fullyQualifiedOutputTableId, tableSchema)
-    hadoopConf.set("mapreduce.job.outputformat.class", classOf[BigQueryOutputFormat[_, _]].getName)
-    val location = hadoopConf.get(STAGING_DATASET_LOCATION)
-    logger.warn(s"******** location is set to $location")
-    val targetTable = BigQueryStrings.parseTableReference(fullyQualifiedOutputTableId)
-    if(isPartitionedByDay) {
-      BigQueryPartitionUtils.createBigQueryPartitionedTable(targetTable)
+  def load(gcsPath: String, destinationTable: TableReference,
+           writeDisposition: WriteDisposition.Value = null,
+           createDisposition: CreateDisposition.Value = null): Unit = {
+    val tableName = BigQueryStrings.toString(destinationTable)
+    logger.info(s"Loading $gcsPath into $tableName")
+    var loadConfig = new JobConfigurationLoad()
+      .setDestinationTable(destinationTable)
+      .setSourceFormat("NEWLINE_DELIMITED_JSON")
+      .setSourceUris(List(gcsPath).asJava)
+    if (writeDisposition != null) {
+      loadConfig = loadConfig.setWriteDisposition(writeDisposition.toString)
+    }
+    if (createDisposition != null) {
+      loadConfig = loadConfig.setCreateDisposition(createDisposition.toString)
     }
 
-    adaptedDf
-      .toJSON
-      .rdd
-      .map(json => (null, jsonParser.parse(json)))
-      .saveAsNewAPIHadoopDataset(hadoopConf)
+    val jobConfig = new JobConfiguration().setLoad(loadConfig)
+    val jobReference = createJobReference(projectId, JOB_ID_PREFIX)
+    val job = new Job().setConfiguration(jobConfig).setJobReference(jobReference)
+    val jobHandle = bigquery.jobs().insert(projectId, job).execute()
+    waitForJob(job)
   }
-
 
   /**
     * Perform a BigQuery SELECT query and save results to a temporary table.
@@ -133,7 +137,7 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
   private def stagingDataset(location: String): DatasetReference = {
     // Create staging dataset if it does not already exist
     val prefix = hadoopConf.get(STAGING_DATASET_PREFIX, STAGING_DATASET_PREFIX_DEFAULT)
-    val datasetId = prefix + "eu"
+    val datasetId = prefix + location.toLowerCase
     try {
       bigquery.datasets().get(projectId, datasetId).execute()
       logger.warn(s"Staging dataset $projectId:$datasetId already exists")
