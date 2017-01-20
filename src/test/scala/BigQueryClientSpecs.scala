@@ -53,7 +53,7 @@ class BigQueryClientSpecs extends FeatureSpec with DataFrameSuiteBase with Mocki
 
   scenario("When writing to BQ") {
     val sqlCtx = sqlContext
-    val gcsPath = "testfile2.json"
+    val gcsPath = "/tmp/testfile2.json"
     FileUtils.deleteQuietly(new File(gcsPath))
     val sampleJson = """{
                        |	"id": 1,

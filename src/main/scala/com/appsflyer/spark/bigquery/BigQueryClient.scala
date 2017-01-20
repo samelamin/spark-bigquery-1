@@ -1,9 +1,6 @@
 package com.appsflyer.spark.bigquery
-
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-
-import com.appsflyer.spark.utils.BigQueryPartitionUtils
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.client.http.javanet.NetHttpTransport
@@ -13,18 +10,14 @@ import com.google.api.services.bigquery.model._
 import com.google.cloud.hadoop.io.bigquery._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.google.gson.{JsonObject, JsonParser}
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.io.LongWritable
 import org.apache.hadoop.util.Progressable
-import org.apache.log4j.LogManager
 import org.apache.spark.sql._
 import org.apache.spark.sql.DataFrame
-
 import scala.collection.JavaConverters._
 import org.joda.time.Instant
 import org.joda.time.format.DateTimeFormat
 import org.slf4j.{Logger, LoggerFactory}
-
 import scala.util.Random
 import scala.util.control.NonFatal
 
@@ -40,7 +33,6 @@ object BigQueryClient {
   val STAGING_DATASET_DESCRIPTION = "Spark BigQuery staging dataset"
   val TIME_FORMATTER = DateTimeFormat.forPattern("yyyyMMddHHmmss")
   private val SCOPES = List(BigqueryScopes.BIGQUERY).asJava
-
   private var instance: BigQueryClient = null
 
   def getInstance(sqlContext: SQLContext): BigQueryClient = {
@@ -83,7 +75,6 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
   private val PRIORITY = if (inConsole) "INTERACTIVE" else "BATCH"
   private val TABLE_ID_PREFIX = "spark_bigquery"
   private val JOB_ID_PREFIX = "spark_bigquery"
-
 
   def load(gcsPath: String, destinationTable: TableReference, tableSchema: String = "",
            writeDisposition: WriteDisposition.Value = null,
