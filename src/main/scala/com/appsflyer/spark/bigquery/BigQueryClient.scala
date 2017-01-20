@@ -1,6 +1,8 @@
 package com.appsflyer.spark.bigquery
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+
+import com.appsflyer.spark.utils.BigQueryPartitionUtils
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.client.http.javanet.NetHttpTransport
@@ -10,14 +12,18 @@ import com.google.api.services.bigquery.model._
 import com.google.cloud.hadoop.io.bigquery._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.google.gson.{JsonObject, JsonParser}
-import org.apache.hadoop.io.LongWritable
+import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.io.{LongWritable, NullWritable}
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat
 import org.apache.hadoop.util.Progressable
 import org.apache.spark.sql._
 import org.apache.spark.sql.DataFrame
+
 import scala.collection.JavaConverters._
 import org.joda.time.Instant
 import org.joda.time.format.DateTimeFormat
 import org.slf4j.{Logger, LoggerFactory}
+
 import scala.util.Random
 import scala.util.control.NonFatal
 
@@ -65,8 +71,9 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
   val STAGING_DATASET_TABLE_EXPIRATION_MS = 86400000L
   val STAGING_DATASET_DESCRIPTION = "Spark BigQuery staging dataset"
   val DEFAULT_TABLE_EXPIRATION_MS = 259200000L
+  val ALLOW_SCHEMA_UPDATES = "ALLOW_SCHEMA_UPDATES"
 
-  private val logger: Logger = LoggerFactory.getLogger(classOf[BigQueryClient])
+  private val logger = LoggerFactory.getLogger(classOf[BigQueryClient])
 
 
   private def projectId = hadoopConf.get(BigQueryConfiguration.PROJECT_ID_KEY)
@@ -76,18 +83,30 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
   private val TABLE_ID_PREFIX = "spark_bigquery"
   private val JOB_ID_PREFIX = "spark_bigquery"
 
-  def load(gcsPath: String, destinationTable: TableReference, tableSchema: String = "",
+
+
+  def load(
+           destinationTable: TableReference,
+           bigQuerySchema: String,
+           gcsPath: String,
+           isPartitionedByDay: Boolean = false,
            writeDisposition: WriteDisposition.Value = null,
            createDisposition: CreateDisposition.Value = null): Unit = {
-
-
-    val tableName = BigQueryStrings.toString(destinationTable)
-    logger.info(s"Loading $gcsPath into $tableName")
+    if(isPartitionedByDay) {
+      BigQueryPartitionUtils.createBigQueryPartitionedTable(destinationTable)
+    }
+    val tableSchema = new TableSchema().setFields(BigQueryUtils.getSchemaFromString(bigQuerySchema))
+    val allow_schema_updates = hadoopConf.get(ALLOW_SCHEMA_UPDATES,"false").toBoolean
     var loadConfig = new JobConfigurationLoad()
+        .setSchema(tableSchema)
       .setDestinationTable(destinationTable)
       .setSourceFormat("NEWLINE_DELIMITED_JSON")
-      .setSchemaInline(tableSchema)
-      .setSourceUris(List(gcsPath).asJava)
+      .setSourceUris(List(gcsPath + "/*").asJava)
+
+    if(allow_schema_updates) {
+      loadConfig.setSchemaUpdateOptions(List("ALLOW_FIELD_ADDITION", "ALLOW_FIELD_RELAXATION").asJava)
+    }
+
     if (writeDisposition != null) {
       loadConfig = loadConfig.setWriteDisposition(writeDisposition.toString)
     }
@@ -105,19 +124,11 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
   /**
     * Perform a BigQuery SELECT query and save results to a temporary table.
     */
-  def query(sqlQuery: String): DataFrame = {
+  def query(sqlQuery: String): Unit = {
     val tableReference = queryCache.get(sqlQuery)
     val fullyQualifiedInputTableId = BigQueryStrings.toString(tableReference)
     BigQueryConfiguration.configureBigQueryInput(hadoopConf, fullyQualifiedInputTableId)
 
-    val tableData = sqlContext.sparkContext.newAPIHadoopRDD(
-      hadoopConf,
-      classOf[GsonBigQueryInputFormat],
-      classOf[LongWritable],
-      classOf[JsonObject]).map(_._2.toString)
-
-    val df = sqlContext.read.json(tableData)
-    df
   }
   private val queryCache: LoadingCache[String, TableReference] =
     CacheBuilder.newBuilder()
@@ -126,7 +137,7 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
       override def load(key: String): TableReference = {
         val sqlQuery = key
         logger.warn(s"Executing query $sqlQuery")
-        val location = hadoopConf.get(STAGING_DATASET_LOCATION)
+        val location = hadoopConf.get(STAGING_DATASET_LOCATION, STAGING_DATASET_LOCATION_DEFAULT)
         val destinationTable = temporaryTable(location)
         logger.warn(s"Destination table: $destinationTable")
         val job = createQueryJob(sqlQuery, destinationTable, dryRun = false)
@@ -199,6 +210,11 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
   private def createJobReference(projectId: String, jobIdPrefix: String): JobReference = {
     val fullJobId = projectId + "-" + UUID.randomUUID().toString
     new JobReference().setProjectId(projectId).setJobId(fullJobId)
+  }
+
+  private def delete(path: Path): Unit = {
+    val fs = FileSystem.get(path.toUri, hadoopConf)
+    fs.delete(path, true)
   }
 
 }
