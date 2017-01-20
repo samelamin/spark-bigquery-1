@@ -82,6 +82,7 @@ class BigQueryClientSpecs extends FeatureSpec with DataFrameSuiteBase with Mocki
     val adaptedDf = BigQueryAdapter(df)
     val bigQueryMock =  mock[Bigquery](RETURNS_DEEP_STUBS)
     lazy val jsonParser = new JsonParser()
+    hadoopConf.set("fs.gs.auth.service.account.enable", "false")
 
     val fullyQualifiedOutputTableId = "testProjectID:test_dataset.test"
     val tableSchema = BigQuerySchema(df)
