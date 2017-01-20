@@ -27,7 +27,7 @@ import org.apache.spark.sql.types._
   * 1) Valid characters are: letters, digits and underscores
   * 2) All letters must be lowercase
   */
-object BigQueryAdapter {
+object BigQueryAdapter extends Serializable{
 
   private def adaptName(name: String, siblings: Array[String]): String = {
     var newName = name.replaceAll("\\W", "_").toLowerCase

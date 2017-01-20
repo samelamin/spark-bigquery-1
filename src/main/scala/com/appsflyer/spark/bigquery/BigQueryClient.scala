@@ -31,13 +31,41 @@ import scala.util.control.NonFatal
 /**
   * Created by sam elamin on 11/01/2017.
   */
+object BigQueryClient {
+  val STAGING_DATASET_PREFIX = "bq.staging_dataset.prefix"
+  val STAGING_DATASET_PREFIX_DEFAULT = "spark_bigquery_staging_"
+  val STAGING_DATASET_LOCATION = "bq.staging_dataset.location"
+  val STAGING_DATASET_LOCATION_DEFAULT = "US"
+  val STAGING_DATASET_TABLE_EXPIRATION_MS = 86400000L
+  val STAGING_DATASET_DESCRIPTION = "Spark BigQuery staging dataset"
+  val TIME_FORMATTER = DateTimeFormat.forPattern("yyyyMMddHHmmss")
+  private val SCOPES = List(BigqueryScopes.BIGQUERY).asJava
+
+  private var instance: BigQueryClient = null
+
+  def getInstance(sqlContext: SQLContext): BigQueryClient = {
+    if (instance == null) {
+      val bigquery = {
+        val credential = GoogleCredential.getApplicationDefault.createScoped(SCOPES)
+        new Bigquery.Builder(new NetHttpTransport, new JacksonFactory, credential)
+          .setApplicationName("spark-bigquery")
+          .build()
+      }
+      instance = new BigQueryClient(sqlContext,bigquery)
+    }
+    instance
+  }
+}
+
+
 class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) extends Serializable  {
 
   @transient
   lazy val jsonParser = new JsonParser()
 
-
+  @transient
   val hadoopConf = sqlContext.sparkContext.hadoopConfiguration
+
   val STAGING_DATASET_PREFIX = "bq.staging_dataset.prefix"
   val STAGING_DATASET_PREFIX_DEFAULT = "spark_bigquery_staging_"
   val STAGING_DATASET_LOCATION = "bq.staging_dataset.location"
@@ -48,37 +76,26 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
 
   private val logger: Logger = LoggerFactory.getLogger(classOf[BigQueryClient])
 
-  private val SCOPES = List(BigqueryScopes.BIGQUERY).asJava
-
-  if(bigquery == null) {
-    bigquery =
-      {
-        val credential: GoogleCredential = GoogleCredential.getApplicationDefault.createScoped(SCOPES)
-        new Bigquery.Builder(new NetHttpTransport, new JacksonFactory, credential)
-          .setApplicationName("spark-bigquery")
-          .build()
-      }
-  }
 
   private def projectId = hadoopConf.get(BigQueryConfiguration.PROJECT_ID_KEY)
-
-
   private def inConsole = Thread.currentThread().getStackTrace.exists(
     _.getClassName.startsWith("scala.tools.nsc.interpreter."))
   private val PRIORITY = if (inConsole) "INTERACTIVE" else "BATCH"
   private val TABLE_ID_PREFIX = "spark_bigquery"
   private val JOB_ID_PREFIX = "spark_bigquery"
-  private val TIME_FORMATTER = DateTimeFormat.forPattern("yyyyMMddHHmmss")
 
 
-  def load(gcsPath: String, destinationTable: TableReference,
+  def load(gcsPath: String, destinationTable: TableReference, tableSchema: String = "",
            writeDisposition: WriteDisposition.Value = null,
            createDisposition: CreateDisposition.Value = null): Unit = {
+
+
     val tableName = BigQueryStrings.toString(destinationTable)
     logger.info(s"Loading $gcsPath into $tableName")
     var loadConfig = new JobConfigurationLoad()
       .setDestinationTable(destinationTable)
       .setSourceFormat("NEWLINE_DELIMITED_JSON")
+      .setSchemaInline(tableSchema)
       .setSourceUris(List(gcsPath).asJava)
     if (writeDisposition != null) {
       loadConfig = loadConfig.setWriteDisposition(writeDisposition.toString)
@@ -90,7 +107,7 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
     val jobConfig = new JobConfiguration().setLoad(loadConfig)
     val jobReference = createJobReference(projectId, JOB_ID_PREFIX)
     val job = new Job().setConfiguration(jobConfig).setJobReference(jobReference)
-    val jobHandle = bigquery.jobs().insert(projectId, job).execute()
+    bigquery.jobs().insert(projectId, job).execute()
     waitForJob(job)
   }
 
@@ -119,7 +136,6 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
         val sqlQuery = key
         logger.warn(s"Executing query $sqlQuery")
         val location = hadoopConf.get(STAGING_DATASET_LOCATION)
-        logger.warn(s"******** location is set to $location")
         val destinationTable = temporaryTable(location)
         logger.warn(s"Destination table: $destinationTable")
         val job = createQueryJob(sqlQuery, destinationTable, dryRun = false)
@@ -161,7 +177,7 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
   }
 
   private def temporaryTable(location: String): TableReference = {
-    val now = Instant.now().toString(TIME_FORMATTER)
+    val now = Instant.now().toString(BigQueryClient.TIME_FORMATTER)
     val tableId = TABLE_ID_PREFIX + "_" + now + "_" + Random.nextInt(Int.MaxValue)
     new TableReference()
       .setProjectId(projectId)

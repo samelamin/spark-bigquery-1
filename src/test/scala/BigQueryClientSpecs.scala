@@ -8,7 +8,7 @@ import com.holdenkarau.spark.testing.DataFrameSuiteBase
 import org.apache.hadoop.io.LongWritable
 import org.scalatest.FeatureSpec
 import org.mockito.Mockito._
-import org.mockito.Matchers.{any,eq => mockitoEq}
+import org.mockito.Matchers.{any, eq => mockitoEq}
 import org.scalatest.mock.MockitoSugar
 import com.google.gson.{JsonObject, JsonParser}
 import org.apache.commons.io.FileUtils
@@ -103,7 +103,7 @@ class BigQueryClientSpecs extends FeatureSpec with DataFrameSuiteBase with Mocki
     val bigQueryClient = setupBigQueryClient(sqlCtx, bigQueryMock)
     hadoopConf.set(bigQueryClient.STAGING_DATASET_LOCATION,"US")
 
-    val actualDF = bigQueryClient.query("select * from test")
+//    val actualDF = bigQueryClient.query("select * from test")
 
 
 //    verify(bigQueryMock.jobs().insert(mockitoEq(jobProjectId),any[Job]), times(1)).execute()

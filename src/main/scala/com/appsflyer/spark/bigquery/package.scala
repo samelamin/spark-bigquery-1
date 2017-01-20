@@ -1,9 +1,7 @@
 package com.appsflyer.spark
 
-import com.appsflyer.spark.bigquery.BigQueryClient
 import com.appsflyer.spark.bigquery.streaming._
 import com.appsflyer.spark.utils.BigQueryPartitionUtils
-import com.google.api.services.bigquery.model.TableReference
 import com.google.cloud.hadoop.io.bigquery.{BigQueryConfiguration, BigQueryOutputFormat}
 import com.google.gson.JsonParser
 import org.apache.spark.sql._
@@ -81,11 +79,15 @@ package object bigquery {
     * Enhanced version of DataFrame with BigQuery support.
     */
   implicit class BigQueryDataFrame(self: DataFrame) extends Serializable {
-    val adaptedDf: DataFrame = BigQueryAdapter(self)
-    val bq = new BigQueryClient(self.sqlContext)
+    val adaptedDf = BigQueryAdapter(self)
 
     @transient
     lazy val hadoopConf = self.sqlContext.sparkContext.hadoopConfiguration
+
+    @transient
+    lazy val bq = BigQueryClient.getInstance(self.sqlContext)
+
+    val STAGING_DATASET_LOCATION = "bq.staging_dataset.location"
 
     @transient
     lazy val jsonParser = new JsonParser()
@@ -102,25 +104,19 @@ package object bigquery {
                             writeDisposition: WriteDisposition.Value = null,
                             createDisposition: CreateDisposition.Value = null): Unit = {
 
-//      val tableSchema = BigQuerySchema(adaptedDf)
-//      BigQueryConfiguration.configureBigQueryOutput(hadoopConf, fullyQualifiedOutputTableId, tableSchema)
-//      hadoopConf.set("mapreduce.job.outputformat.class", classOf[BigQueryOutputFormat[_, _]].getName)
-//      val location = hadoopConf.get(bq.STAGING_DATASET_LOCATION)
-//      val targetTable = BigQueryStrings.parseTableReference(fullyQualifiedOutputTableId)
-//      if(isPartitionedByDay) {
-//        BigQueryPartitionUtils.createBigQueryPartitionedTable(targetTable)
-//      }
-//
-//      adaptedDf
-//        .toJSON
-//        .rdd
-//        .map(json => (null, jsonParser.parse(json)))
-//        .saveAsNewAPIHadoopDataset(hadoopConf)
-
+      val tableSchema = BigQuerySchema(adaptedDf)
+      BigQueryConfiguration.configureBigQueryOutput(hadoopConf, fullyQualifiedOutputTableId, tableSchema)
+      hadoopConf.set("mapreduce.job.outputformat.class", classOf[BigQueryOutputFormat[_, _]].getName)
+      val location = hadoopConf.get(STAGING_DATASET_LOCATION)
+      val targetTable = BigQueryStrings.parseTableReference(fullyQualifiedOutputTableId)
+      if(isPartitionedByDay) {
+        BigQueryPartitionUtils.createBigQueryPartitionedTable(targetTable)
+      }
       val tableRef = BigQueryStrings.parseTableReference(fullyQualifiedOutputTableId)
       val bucket = hadoopConf.get(BigQueryConfiguration.GCS_BUCKET_KEY)
       val temp = s"spark-bigquery-${System.currentTimeMillis()}=${Random.nextInt(Int.MaxValue)}"
       val gcsPath = s"gs://$bucket/hadoop/tmp/spark-bigquery/$temp"
+      hadoopConf.set(BigQueryConfiguration.TEMP_GCS_PATH_KEY, gcsPath)
 
       adaptedDf
         .toJSON
@@ -133,8 +129,25 @@ package object bigquery {
             hadoopConf)
 
 
-      bq.load(gcsPath, tableRef, writeDisposition, createDisposition)
+      bq.load(gcsPath, tableRef, tableSchema)
       delete(new Path(gcsPath))
+
+
+//      val tableSchema = BigQuerySchema(adaptedDf)
+//
+//      BigQueryConfiguration.configureBigQueryOutput(hadoopConf, fullyQualifiedOutputTableId, tableSchema)
+//      hadoopConf.set("mapreduce.job.outputformat.class", classOf[BigQueryOutputFormat[_, _]].getName)
+//      val bqService = BigQueryServiceFactory.getService
+//      val targetTable = BigQueryStrings.parseTableReference(fullyQualifiedOutputTableId)
+//
+//      if(isPartitionedByDay) {
+//        BigQueryPartitionUtils.createBigQueryPartitionedTable(targetTable,bqService)
+//      }
+//      adaptedDf
+//        .toJSON
+//        .rdd
+//        .map(json => (null, jsonParser.parse(json)))
+//        .saveAsNewAPIHadoopDataset(hadoopConf)
     }
 
     private def delete(path: Path): Unit = {
