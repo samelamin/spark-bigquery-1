@@ -11,8 +11,6 @@ import com.google.api.services.bigquery.model._
 import com.google.cloud.hadoop.io.bigquery._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.google.gson.JsonParser
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.io
 import org.apache.hadoop.util.Progressable
 import org.apache.spark.sql._
 import scala.collection.JavaConverters._
@@ -44,7 +42,6 @@ object BigQueryClient {
   }
 }
 
-
 class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) extends Serializable  {
   @transient
   lazy val jsonParser = new JsonParser()
@@ -59,10 +56,7 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
   val STAGING_DATASET_DESCRIPTION = "Spark BigQuery staging dataset"
   val DEFAULT_TABLE_EXPIRATION_MS = 259200000L
   val ALLOW_SCHEMA_UPDATES = "ALLOW_SCHEMA_UPDATES"
-
   private val logger = LoggerFactory.getLogger(classOf[BigQueryClient])
-
-
   private def projectId = hadoopConf.get(BigQueryConfiguration.PROJECT_ID_KEY)
   private def inConsole = Thread.currentThread().getStackTrace.exists(
     _.getClassName.startsWith("scala.tools.nsc.interpreter."))
@@ -70,10 +64,7 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
   private val TABLE_ID_PREFIX = "spark_bigquery"
   private val JOB_ID_PREFIX = "spark_bigquery"
 
-
-
-  def load(
-           destinationTable: TableReference,
+  def load(destinationTable: TableReference,
            bigQuerySchema: String,
            gcsPath: String,
            isPartitionedByDay: Boolean = false,
@@ -198,6 +189,4 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
     val fullJobId = projectId + "-" + UUID.randomUUID().toString
     new JobReference().setProjectId(projectId).setJobId(fullJobId)
   }
-
-
 }

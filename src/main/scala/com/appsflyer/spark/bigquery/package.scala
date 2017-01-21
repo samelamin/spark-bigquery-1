@@ -1,19 +1,14 @@
 package com.appsflyer.spark
-
-import java.util
-
 import com.appsflyer.spark.bigquery.streaming._
-import com.appsflyer.spark.utils.BigQueryPartitionUtils
-import com.google.api.services.bigquery.model.{TableFieldSchema, TableReference, TableSchema}
+import com.google.api.services.bigquery.model.{TableReference}
 import com.google.cloud.hadoop.io.bigquery.{BigQueryConfiguration, BigQueryOutputFormat}
-import com.google.gson.{JsonElement, JsonObject, JsonParser}
+import com.google.gson.{JsonObject, JsonParser}
 import org.apache.spark.sql._
 import com.google.cloud.hadoop.io.bigquery._
-import org.apache.hadoop.io.{LongWritable, NullWritable, Text}
+import org.apache.hadoop.io.{LongWritable, NullWritable}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat
 import org.slf4j.LoggerFactory
-
 import scala.util.Random
 
 package object bigquery {

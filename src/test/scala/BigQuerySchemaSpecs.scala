@@ -1,10 +1,7 @@
 import com.appsflyer.spark.bigquery.BigQuerySchema
 import com.holdenkarau.spark.testing.DataFrameSuiteBase
-import org.apache.spark
-import org.apache.spark.sql.{SQLContext, SparkSession}
 import org.scalatest.Matchers._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
-import org.apache.spark.sql.types.StructType
 
 class BigQuerySchemaSpecs extends FeatureSpec with GivenWhenThen with DataFrameSuiteBase {
   feature("Schema Converters. Dataframe To BQ Schema") {
