@@ -30,8 +30,7 @@ package object bigquery {
     * Enhanced version of SQLContext with BigQuery support.
     */
   implicit class BigQuerySQLContext(sqlContext: SQLContext) extends Serializable {
-    val bq = new BigQueryClient(sqlContext)
-
+    lazy val bq = BigQueryClient.getInstance(sqlContext)
     @transient
     lazy val hadoopConf = sqlContext.sparkContext.hadoopConfiguration
 
@@ -104,11 +103,7 @@ package object bigquery {
 
     @transient
     lazy val hadoopConf = self.sqlContext.sparkContext.hadoopConfiguration
-
-    @transient
     lazy val bq = BigQueryClient.getInstance(self.sqlContext)
-
-    val STAGING_DATASET_LOCATION = "bq.staging_dataset.location"
 
     @transient
     lazy val jsonParser = new JsonParser()
@@ -128,13 +123,13 @@ package object bigquery {
       val destinationTable = BigQueryStrings.parseTableReference(fullyQualifiedOutputTableId)
       val bigQuerySchema = BigQuerySchema(adaptedDf)
       val gcsPath = writeDFToGoogleStorage(adaptedDf,destinationTable,bigQuerySchema)
-
       bq.load(destinationTable,
         bigQuerySchema,
         gcsPath,
         isPartitionedByDay,
         writeDisposition,
         createDisposition)
+      delete(new Path(gcsPath))
     }
 
     def writeDFToGoogleStorage(adaptedDf: DataFrame,
@@ -161,8 +156,10 @@ package object bigquery {
       gcsPath
     }
 
-
-
+    private def delete(path: Path): Unit = {
+      val fs = FileSystem.get(path.toUri, hadoopConf)
+      fs.delete(path, true)
+    }
     /**
       * Save DataFrame data into BigQuery table using streaming API
       *

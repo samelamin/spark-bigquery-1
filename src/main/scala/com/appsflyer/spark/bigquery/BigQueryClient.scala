@@ -1,7 +1,6 @@
 package com.appsflyer.spark.bigquery
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-
 import com.appsflyer.spark.utils.BigQueryPartitionUtils
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
@@ -11,19 +10,15 @@ import com.google.api.services.bigquery.{Bigquery, BigqueryScopes}
 import com.google.api.services.bigquery.model._
 import com.google.cloud.hadoop.io.bigquery._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
-import com.google.gson.{JsonObject, JsonParser}
+import com.google.gson.JsonParser
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.io.{LongWritable, NullWritable}
-import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat
+import org.apache.hadoop.io
 import org.apache.hadoop.util.Progressable
 import org.apache.spark.sql._
-import org.apache.spark.sql.DataFrame
-
 import scala.collection.JavaConverters._
 import org.joda.time.Instant
 import org.joda.time.format.DateTimeFormat
-import org.slf4j.{Logger, LoggerFactory}
-
+import org.slf4j.LoggerFactory
 import scala.util.Random
 import scala.util.control.NonFatal
 
@@ -31,12 +26,6 @@ import scala.util.control.NonFatal
   * Created by sam elamin on 11/01/2017.
   */
 object BigQueryClient {
-  val STAGING_DATASET_PREFIX = "bq.staging_dataset.prefix"
-  val STAGING_DATASET_PREFIX_DEFAULT = "spark_bigquery_staging_"
-  val STAGING_DATASET_LOCATION = "bq.staging_dataset.location"
-  val STAGING_DATASET_LOCATION_DEFAULT = "US"
-  val STAGING_DATASET_TABLE_EXPIRATION_MS = 86400000L
-  val STAGING_DATASET_DESCRIPTION = "Spark BigQuery staging dataset"
   val TIME_FORMATTER = DateTimeFormat.forPattern("yyyyMMddHHmmss")
   private val SCOPES = List(BigqueryScopes.BIGQUERY).asJava
   private var instance: BigQueryClient = null
@@ -57,10 +46,8 @@ object BigQueryClient {
 
 
 class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) extends Serializable  {
-
   @transient
   lazy val jsonParser = new JsonParser()
-
   @transient
   val hadoopConf = sqlContext.sparkContext.hadoopConfiguration
 
@@ -212,9 +199,5 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) exte
     new JobReference().setProjectId(projectId).setJobId(fullJobId)
   }
 
-  private def delete(path: Path): Unit = {
-    val fs = FileSystem.get(path.toUri, hadoopConf)
-    fs.delete(path, true)
-  }
 
 }
