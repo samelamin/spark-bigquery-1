@@ -53,11 +53,27 @@ The project was inspired by [spotify/spark-bigquery](https://github.com/spotify/
 
 #### SBT
 
+To use it in a local SBT console first add the package as a dependency then set up your project details
 ```sbt
 resolvers += Opts.resolver.sonatypeSnapshots
 
 libraryDependencies += "com.appsflyer" %% "spark-bigquery" % "0.1.0"
 ```
+
+```scala
+import com.appsflyer.spark.bigquery._
+
+// Set up GCP credentials
+sqlContext.setGcpJsonKeyFile("<JSON_KEY_FILE>")
+
+// Set up BigQuery project and bucket
+sqlContext.setBigQueryProjectId("<BILLING_PROJECT>")
+sqlContext.setBigQueryGcsBucket("<GCS_BUCKET>")
+
+// Set up BigQuery dataset location, default is US
+sqlContext.setBigQueryDatasetLocation("<DATASET_LOCATION>")
+```
+
 
 ### Saving DataFrame using BigQuery Hadoop writer API
 
@@ -68,6 +84,21 @@ val df = ...
 df.saveAsBigQueryTable("project-id:dataset-id.table-name")
 ```
 
+### Reading DataFrame From BigQuery
+
+```scala
+import com.appsflyer.spark.bigquery._
+
+
+// Load everything from a table
+val table = sqlContext.bigQueryTable("bigquery-public-data:samples.shakespeare")
+
+// Load results from a SQL query
+// Only legacy SQL dialect is supported for now
+val df = sqlContext.bigQuerySelect(
+  "SELECT word, word_count FROM [bigquery-public-data:samples.shakespeare]")
+```
+
 ### Saving DataFrame using BigQuery streaming API
 
 ```scala
@@ -75,6 +106,17 @@ import com.appsflyer.spark.bigquery._
 
 val df = ...
 df.streamToBigQueryTable("project-id:dataset-id.table-name")
+```
+
+
+### Update Schemas
+
+You can also allow the saving of a dataframe to update a schema:
+
+```scala
+import com.appsflyer.spark.bigquery._
+
+sqlContext.setAllowSchemaUpdates()
 ```
 
 Notes on using this API:
