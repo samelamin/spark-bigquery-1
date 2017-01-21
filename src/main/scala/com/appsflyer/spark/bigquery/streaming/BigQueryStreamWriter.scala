@@ -56,7 +56,7 @@ class BigQueryStreamWriter(fullyQualifiedOutputTableId: String, batchSize: Int,
 
   override def process(value: String): Unit = {
     if(isPartitionedByDay) {
-      BigQueryPartitionUtils.createBigQueryPartitionedTable(targetTable,bqService)
+      BigQueryPartitionUtils.createBigQueryPartitionedTable(targetTable)
     }
     if (rowIndex < batchSize) {
       rows(rowIndex).setJson(gson.fromJson(value, targetClass)).setInsertId(s"${batchId}_${rowIndex}")

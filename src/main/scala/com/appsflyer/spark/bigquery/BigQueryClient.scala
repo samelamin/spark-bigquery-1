@@ -1,36 +1,54 @@
 package com.appsflyer.spark.bigquery
-
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-
+import com.appsflyer.spark.utils.BigQueryPartitionUtils
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.services.bigquery.{Bigquery, BigqueryScopes}
 import com.google.api.services.bigquery.model._
-import com.google.cloud.hadoop.io.bigquery.{BigQueryConfiguration, BigQueryStrings, BigQueryUtils, GsonBigQueryInputFormat}
+import com.google.api.services.bigquery.model.{Dataset => BQDataset}
+import com.google.cloud.hadoop.io.bigquery._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
-import com.google.gson.JsonObject
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.io.LongWritable
+import com.google.gson.JsonParser
 import org.apache.hadoop.util.Progressable
 import org.apache.spark.sql._
-import org.apache.spark.sql.DataFrame
-import com.google.api.services.bigquery.model.{Dataset => BQDataset}
 import scala.collection.JavaConverters._
 import org.joda.time.Instant
 import org.joda.time.format.DateTimeFormat
 import org.slf4j.LoggerFactory
-
 import scala.util.Random
 import scala.util.control.NonFatal
 
 /**
   * Created by sam elamin on 11/01/2017.
   */
-class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) {
+object BigQueryClient {
+  val TIME_FORMATTER = DateTimeFormat.forPattern("yyyyMMddHHmmss")
+  private val SCOPES = List(BigqueryScopes.BIGQUERY).asJava
+  private var instance: BigQueryClient = null
+
+  def getInstance(sqlContext: SQLContext): BigQueryClient = {
+    if (instance == null) {
+      val bigquery = {
+        val credential = GoogleCredential.getApplicationDefault.createScoped(SCOPES)
+        new Bigquery.Builder(new NetHttpTransport, new JacksonFactory, credential)
+          .setApplicationName("spark-bigquery")
+          .build()
+      }
+      instance = new BigQueryClient(sqlContext,bigquery)
+    }
+    instance
+  }
+}
+
+class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) extends Serializable  {
+  @transient
+  lazy val jsonParser = new JsonParser()
+  @transient
   val hadoopConf = sqlContext.sparkContext.hadoopConfiguration
+
   val STAGING_DATASET_PREFIX = "bq.staging_dataset.prefix"
   val STAGING_DATASET_PREFIX_DEFAULT = "spark_bigquery_staging_"
   val STAGING_DATASET_LOCATION = "bq.staging_dataset.location"
@@ -38,21 +56,59 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) {
   val STAGING_DATASET_TABLE_EXPIRATION_MS = 86400000L
   val STAGING_DATASET_DESCRIPTION = "Spark BigQuery staging dataset"
   val DEFAULT_TABLE_EXPIRATION_MS = 259200000L
+  val ALLOW_SCHEMA_UPDATES = "ALLOW_SCHEMA_UPDATES"
   private val logger = LoggerFactory.getLogger(classOf[BigQueryClient])
-  private val SCOPES = List(BigqueryScopes.BIGQUERY).asJava
+  private def projectId = hadoopConf.get(BigQueryConfiguration.PROJECT_ID_KEY)
+  private def inConsole = Thread.currentThread().getStackTrace.exists(
+    _.getClassName.startsWith("scala.tools.nsc.interpreter."))
+  private val PRIORITY = if (inConsole) "INTERACTIVE" else "BATCH"
+  private val TABLE_ID_PREFIX = "spark_bigquery"
+  private val JOB_ID_PREFIX = "spark_bigquery"
 
-  if(bigquery == null) {
-    bigquery =
-    {
-      val credential = GoogleCredential.getApplicationDefault.createScoped(SCOPES)
-      new Bigquery.Builder(new NetHttpTransport, new JacksonFactory, credential)
-        .setApplicationName("spark-bigquery")
-        .build()
+  def load(destinationTable: TableReference,
+           bigQuerySchema: String,
+           gcsPath: String,
+           isPartitionedByDay: Boolean = false,
+           writeDisposition: WriteDisposition.Value = null,
+           createDisposition: CreateDisposition.Value = null): Unit = {
+    if(isPartitionedByDay) {
+      BigQueryPartitionUtils.createBigQueryPartitionedTable(destinationTable)
     }
+    val tableSchema = new TableSchema().setFields(BigQueryUtils.getSchemaFromString(bigQuerySchema))
+    val allow_schema_updates = hadoopConf.get(ALLOW_SCHEMA_UPDATES,"false").toBoolean
+    var loadConfig = new JobConfigurationLoad()
+        .setSchema(tableSchema)
+      .setDestinationTable(destinationTable)
+      .setSourceFormat("NEWLINE_DELIMITED_JSON")
+      .setSourceUris(List(gcsPath + "/*").asJava)
+
+    if(allow_schema_updates) {
+      loadConfig.setSchemaUpdateOptions(List("ALLOW_FIELD_ADDITION", "ALLOW_FIELD_RELAXATION").asJava)
+    }
+
+    if (writeDisposition != null) {
+      loadConfig = loadConfig.setWriteDisposition(writeDisposition.toString)
+    }
+    if (createDisposition != null) {
+      loadConfig = loadConfig.setCreateDisposition(createDisposition.toString)
+    }
+
+    val jobConfig = new JobConfiguration().setLoad(loadConfig)
+    val jobReference = createJobReference(projectId, JOB_ID_PREFIX)
+    val job = new Job().setConfiguration(jobConfig).setJobReference(jobReference)
+    bigquery.jobs().insert(projectId, job).execute()
+    waitForJob(job)
   }
 
-  private def projectId = hadoopConf.get(BigQueryConfiguration.PROJECT_ID_KEY)
+  /**
+    * Perform a BigQuery SELECT query and save results to a temporary table.
+    */
+  def query(sqlQuery: String): Unit = {
+    val tableReference = queryCache.get(sqlQuery)
+    val fullyQualifiedInputTableId = BigQueryStrings.toString(tableReference)
+    BigQueryConfiguration.configureBigQueryInput(hadoopConf, fullyQualifiedInputTableId)
 
+  }
   private val queryCache: LoadingCache[String, TableReference] =
     CacheBuilder.newBuilder()
       .expireAfterWrite(STAGING_DATASET_TABLE_EXPIRATION_MS, TimeUnit.MILLISECONDS)
@@ -60,42 +116,14 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) {
       override def load(key: String): TableReference = {
         val sqlQuery = key
         logger.info(s"Executing query $sqlQuery")
-
         val location = hadoopConf.get(STAGING_DATASET_LOCATION, STAGING_DATASET_LOCATION_DEFAULT)
         val destinationTable = temporaryTable(location)
-        val tableName = BigQueryStrings.toString(destinationTable)
         logger.info(s"Destination table: $destinationTable")
-
         val job = createQueryJob(sqlQuery, destinationTable, dryRun = false)
         waitForJob(job)
         destinationTable
       }
     })
-
-  private def inConsole = Thread.currentThread().getStackTrace.exists(
-    _.getClassName.startsWith("scala.tools.nsc.interpreter."))
-  private val PRIORITY = if (inConsole) "INTERACTIVE" else "BATCH"
-  private val TABLE_ID_PREFIX = "spark_bigquery"
-  private val JOB_ID_PREFIX = "spark_bigquery"
-  private val TIME_FORMATTER = DateTimeFormat.forPattern("yyyyMMddHHmmss")
-
-  /**
-    * Perform a BigQuery SELECT query and save results to a temporary table.
-    */
-  def query(sqlQuery: String): DataFrame = {
-    val tableReference = queryCache.get(sqlQuery)
-    val fullyQualifiedInputTableId = BigQueryStrings.toString(tableReference)
-    BigQueryConfiguration.configureBigQueryInput(hadoopConf, fullyQualifiedInputTableId)
-
-    val tableData = sqlContext.sparkContext.newAPIHadoopRDD(
-      hadoopConf,
-      classOf[GsonBigQueryInputFormat],
-      classOf[LongWritable],
-      classOf[JsonObject]).map(_._2.toString)
-
-    val df = sqlContext.read.json(tableData)
-    df
-  }
 
   private def waitForJob(job: Job): Unit = {
     BigQueryUtils.waitForJobCompletion(bigquery, projectId, job.getJobReference, new Progressable {
@@ -130,7 +158,7 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) {
   }
 
   private def temporaryTable(location: String): TableReference = {
-    val now = Instant.now().toString(TIME_FORMATTER)
+    val now = Instant.now().toString(BigQueryClient.TIME_FORMATTER)
     val tableId = TABLE_ID_PREFIX + "_" + now + "_" + Random.nextInt(Int.MaxValue)
     new TableReference()
       .setProjectId(projectId)
@@ -162,5 +190,4 @@ class BigQueryClient(sqlContext: SQLContext, var bigquery: Bigquery = null) {
     val fullJobId = projectId + "-" + UUID.randomUUID().toString
     new JobReference().setProjectId(projectId).setJobId(fullJobId)
   }
-
 }
